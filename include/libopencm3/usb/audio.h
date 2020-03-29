@@ -73,6 +73,8 @@ LGPL License Terms @ref lgpl_license
 #define USB_AUDIO_TYPE_PROCESSING_UNIT		0x07
 #define USB_AUDIO_TYPE_EXTENSION_UNIT		0x08
 
+#define USB_AUDIO_DT_ENDPOINT_SIZE 9
+
 /* Table 4-2: Class-Specific AC Interface Header Descriptor (head) */
 struct usb_audio_header_descriptor_head {
 	uint8_t bLength;
@@ -174,6 +176,10 @@ struct usb_audio_stream_endpoint_descriptor {
 	uint8_t bInterval;
 	uint8_t bRefresh;
 	uint8_t bSynchAddress;
+
+  /* Descriptor ends here.  The following are used internally: */
+  const void *extra;
+  int extralen;
 } __attribute__((packed));
 
 /* Table 4-21: Class-Specific AS Isochronous Audio Data Endpoint Descriptor */

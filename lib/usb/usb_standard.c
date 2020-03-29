@@ -119,14 +119,16 @@ static uint16_t build_config_descriptor(usbd_device *usbd_dev,
 				len -= count;
 				total += count;
 				totallen += ep->bLength;
+				void* extra = *(void**)((void*)ep + ep->bLength);
+				int extralen = *(int*)((void*)ep + ep->bLength + sizeof(void*));
 				/* Copy extra bytes (class specific). */
-				if (ep->extra) {
-					memcpy(buf, ep->extra,
-					       count = MIN(len, ep->extralen));
+				if (extra) {
+					memcpy(buf, extra,
+					       count = MIN(len, extralen));
 					buf += count;
 					len -= count;
 					total += count;
-					totallen += ep->extralen;
+					totallen += extralen;
 				}
 			}
 		}
