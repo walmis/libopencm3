@@ -96,8 +96,17 @@ void st_usbfs_ep_setup(usbd_device *dev, uint8_t addr, uint8_t type,
 	USB_SET_EP_ADDR(addr, addr);
 	USB_SET_EP_TYPE(addr, typelookup[type]);
 
+//  if (epr == EPR_EP_TYPE_ISO) {
+//    epr |= EPR_STAT_TX_VALID;
+//    dp->TXCOUNT1 = dp->TXCOUNT0;
+//    dp->TXADDR1  = dp->TXADDR0;   /* Both buffers overlapped.*/
+//  }
+
 	if (dir || (addr == 0)) {
 		USB_SET_EP_TX_ADDR(addr, dev->pm_top);
+		if(type == USB_ENDPOINT_ATTR_ISOCHRONOUS) {
+		  USB_SET_EP_RX_ADDR(addr, dev->pm_top);
+		}
 		if (callback) {
 			dev->user_callback_ctr[addr][USB_TRANSACTION_IN] =
 			    (void *)callback;
@@ -110,7 +119,12 @@ void st_usbfs_ep_setup(usbd_device *dev, uint8_t addr, uint8_t type,
 	if (!dir) {
 		uint16_t realsize;
 		USB_SET_EP_RX_ADDR(addr, dev->pm_top);
+
 		realsize = st_usbfs_set_ep_rx_bufsize(dev, addr, max_size);
+		if(type == USB_ENDPOINT_ATTR_ISOCHRONOUS) {
+      USB_SET_EP_TX_ADDR(addr, dev->pm_top);
+		  USB_SET_EP_TX_COUNT(addr, USB_GET_EP_RX_COUNT(addr));
+		}
 		if (callback) {
 			dev->user_callback_ctr[addr][USB_TRANSACTION_OUT] =
 			    (void *)callback;
@@ -218,11 +232,36 @@ uint16_t st_usbfs_ep_read_packet(usbd_device *dev, uint8_t addr,
 					 void *buf, uint16_t len)
 {
 	(void)dev;
-	if ((*USB_EP_REG(addr) & USB_EP_RX_STAT) == USB_EP_RX_STAT_VALID) {
-		return 0;
+
+	if ((GET_REG(USB_EP_REG(addr)) & USB_EP_TYPE) == USB_EP_TYPE_ISO) {
+    /* Double buffering is always enabled for isochronous endpoints, and
+       although we overlap the two buffers for simplicity, we still need
+       to read from the right counter. The DTOG_RX bit indicates the buffer
+       that is currently in use by the USB peripheral, that is, the buffer
+       in which the next received packet will be stored, so we need to
+       read the counter of the OTHER buffer, which is where the last
+       received packet was stored.*/
+	  if (!(GET_REG(USB_EP_REG(addr)) & USB_EP_RX_DTOG)) {
+	    /* RXCOUNT1 == EP_RX_COUNT*/
+	    len = MIN(USB_GET_EP_RX_COUNT(addr) & 0x3ff, len);
+	  } else {
+	    /* RXCOUNT0 == EP_TX_COUNT */
+	    len = MIN(USB_GET_EP_TX_COUNT(addr) & 0x3ff, len);
+	  }
+
+	} else {
+	  if ((*USB_EP_REG(addr) & USB_EP_RX_STAT) == USB_EP_RX_STAT_VALID) {
+	    return 0;
+	  }
+
+	  len = MIN(USB_GET_EP_RX_COUNT(addr) & 0x3ff, len);
 	}
 
-	len = MIN(USB_GET_EP_RX_COUNT(addr) & 0x3ff, len);
+//  if (EPR_EP_TYPE_IS_ISO(epr) && !(epr & EPR_DTOG_RX))
+//    n = (size_t)udp->RXCOUNT1 & RXCOUNT_COUNT_MASK;
+//  else
+//    n = (size_t)udp->RXCOUNT0 & RXCOUNT_COUNT_MASK;
+
 	st_usbfs_copy_from_pm(buf, USB_GET_EP_RX_BUFF(addr), len);
 	USB_CLR_EP_RX_CTR(addr);
 
