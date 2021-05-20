@@ -58,6 +58,11 @@
 #define USB_GET_EP_RX_BUFF(EP) \
 	(USB_PMA_BASE + (uint8_t *)(USB_GET_EP_RX_ADDR(EP) * 2))
 
+#define USB_GET_EP_TX_0_BUFF(EP) USB_GET_EP_TX_BUFF(EP)
+#define USB_GET_EP_TX_1_BUFF(EP) USB_GET_EP_RX_BUFF(EP)
+#define USB_GET_EP_RX_0_BUFF(EP) USB_GET_EP_TX_BUFF(EP)
+#define USB_GET_EP_RX_1_BUFF(EP) USB_GET_EP_RX_BUFF(EP)
+
 #endif
 /** @cond */
 #else
